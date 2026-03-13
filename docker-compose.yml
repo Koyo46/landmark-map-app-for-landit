@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: landmark-map-app-for-landit-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: spot_db
+      TZ: "Asia/Tokyo"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+  backend:
+      build:
+        context: ./backend
+        dockerfile: Dockerfile
+      container_name: landmark-map-app-for-landit-backend
+      ports:
+        - "3001:3000"
+      volumes:
+        - ./backend:/app
+        - /app/node_modules
+        - ./data/csv:/app/data/csv:ro
+      environment:
+        DATABASE_URL: postgres://user:password@db:5432/spot_db
+      depends_on:
+        - db
+  frontend:
+      build:
+        context: ./frontend
+        dockerfile: Dockerfile
+      container_name: landmark-map-app-for-landit-frontend
+      ports:
+        - "3000:3000"
+      volumes:
+        - ./frontend:/app
+        - /app/node_modules
+      environment:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+        NODE_ENV: development
+        WATCHPACK_POLLING: "true"
+      command: npm run dev
+      depends_on:
+        - backend
