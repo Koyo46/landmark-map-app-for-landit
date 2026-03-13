@@ -35,3 +35,9 @@ dist/
 tmp/
 temp/
 
+backend/node_modules/
+backend/dist/
+backend/build/
+backend/coverage/
+backend/.env
+backend/.env.*
