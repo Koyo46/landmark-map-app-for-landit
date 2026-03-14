@@ -43,14 +43,14 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="flex min-h-screen flex-col">
+    <main className="flex h-screen flex-col overflow-hidden">
       <header className="border-b border-slate-800 px-6 py-4">
         <h1 className="text-xl font-semibold">Landmark Map</h1>
         <p className="text-sm text-slate-400">
           CSV (name,category,lat,long,address) から自動インポートしたスポットを表示します。
         </p>
       </header>
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         {loading && (
           <div className="flex h-full items-center justify-center text-slate-400">
             読み込み中…
@@ -58,11 +58,11 @@ export default function HomePage() {
         )}
         {error && (
           <div className="flex h-full items-center justify-center text-red-400">
-            エラーaaa: {error}
+            エラー: {error}
           </div>
         )}
         {!loading && !error && (
-          <SpotsMap spots={spots} className="h-[calc(100vh-5rem)]" />
+          <SpotsMap spots={spots} className="h-full" />
         )}
       </div>
     </main>
