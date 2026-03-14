@@ -10,4 +10,3 @@ import { SpotsController } from './spots.controller';
   providers: [SpotsService],
 })
 export class SpotsModule {}
-

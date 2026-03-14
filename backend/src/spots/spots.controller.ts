@@ -10,4 +10,3 @@ export class SpotsController {
     return this.spotsService.findAll();
   }
 }
-

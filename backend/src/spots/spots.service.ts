@@ -4,10 +4,7 @@ import { Repository, DataSource } from 'typeorm';
 import { Spot } from './entities/spot.entity';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-
-// 型定義なしでもビルドできるように require を使用（メインエントリのみ利用）
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const csvParse = require('csv-parse') as typeof import('csv-parse');
+import { parse } from 'csv-parse';
 
 type CsvRecord = {
   name?: string;
@@ -32,9 +29,16 @@ export class SpotsService implements OnApplicationBootstrap {
   }
 
   async findAll(): Promise<
-    { id: number; name: string; category: string | null; address: string | null; lat: number; lng: number }[]
+    {
+      id: number;
+      name: string;
+      category: string | null;
+      address: string | null;
+      lat: number;
+      lng: number;
+    }[]
   > {
-    const rows = await this.dataSource.query(
+    const rowsUnknown: unknown = await this.dataSource.query(
       `
       SELECT
         id,
@@ -47,14 +51,23 @@ export class SpotsService implements OnApplicationBootstrap {
     `,
     );
 
-    return rows.map((row: any) => ({
-      id: Number(row.id),
-      name: row.name as string,
-      category: (row.category ?? null) as string | null,
-      address: (row.address ?? null) as string | null,
-      lat: Number(row.lat),
-      lng: Number(row.lng),
-    }));
+    if (!Array.isArray(rowsUnknown)) {
+      return [];
+    }
+
+    return rowsUnknown
+      .filter(
+        (row): row is Record<string, unknown> =>
+          typeof row === 'object' && row !== null,
+      )
+      .map((row) => ({
+        id: Number(row.id),
+        name: typeof row.name === 'string' ? row.name : '',
+        category: typeof row.category === 'string' ? row.category : null,
+        address: typeof row.address === 'string' ? row.address : null,
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+      }));
   }
 
   private async importFromCsvDirectory(): Promise<void> {
@@ -66,12 +79,14 @@ export class SpotsService implements OnApplicationBootstrap {
     let files: string[];
     try {
       files = await fs.readdir(csvDir);
-    } catch (error) {
+    } catch {
       this.logger.warn(`CSV directory not found or not readable: ${csvDir}`);
       return;
     }
 
-    const csvFiles = files.filter((name) => name.toLowerCase().endsWith('.csv'));
+    const csvFiles = files.filter((name) =>
+      name.toLowerCase().endsWith('.csv'),
+    );
     if (csvFiles.length === 0) {
       this.logger.log('No CSV files found. Skipping import.');
       return;
@@ -101,7 +116,7 @@ export class SpotsService implements OnApplicationBootstrap {
     let records: CsvRecord[];
     try {
       records = await new Promise<CsvRecord[]>((resolve, reject) => {
-        csvParse.parse(
+        parse(
           content,
           {
             columns: true,
@@ -118,7 +133,10 @@ export class SpotsService implements OnApplicationBootstrap {
         );
       });
     } catch (error) {
-      this.logger.error(`Failed to parse CSV file: ${filePath}`, error as Error);
+      this.logger.error(
+        `Failed to parse CSV file: ${filePath}`,
+        error as Error,
+      );
       return;
     }
 
@@ -145,9 +163,11 @@ export class SpotsService implements OnApplicationBootstrap {
           [name, category, address, lng, lat],
         );
       } catch (error) {
-        this.logger.error(`Failed to insert row #${index + 1} from ${filePath}`, error as Error);
+        this.logger.error(
+          `Failed to insert row #${index + 1} from ${filePath}`,
+          error as Error,
+        );
       }
     }
   }
 }
-

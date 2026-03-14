@@ -2,8 +2,8 @@
 
 import "leaflet/dist/leaflet.css";
 
-import { useState, useEffect, useRef } from "react";
-import { MapContainer, useMapEvents, useMap, TileLayer, Marker, Popup } from "react-leaflet";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { MapContainer, useMapEvents, useMap, TileLayer, Marker, Popup, Circle } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
 import L from "leaflet";
 
@@ -59,6 +59,11 @@ type VisibleSpotWithDistance = Spot & {
   distanceKm: number;
 };
 
+type CenterLatLng = {
+  lat: number;
+  lng: number;
+};
+
 type Props = {
   spots: Spot[];
   className?: string;
@@ -81,14 +86,17 @@ function MapCenterObserver() {
 function VisibleSpotsUpdater({
   spots,
   onVisibleChange,
+  onCenterChange,
 }: {
   spots: Spot[];
   onVisibleChange: (visible: VisibleSpotWithDistance[]) => void;
+  onCenterChange: (center: CenterLatLng) => void;
 }) {
   const map = useMap();
   const updateVisible = () => {
     const bounds = map.getBounds();
     const center = map.getCenter();
+    onCenterChange({ lat: center.lat, lng: center.lng });
     const visible = spots
       .filter((s) => bounds.contains([s.lat, s.lng]))
       .map((s) => ({
@@ -106,10 +114,31 @@ function VisibleSpotsUpdater({
 }
 
 export default function SpotsMap({ spots, className }: Props) {
+  const [activeTab, setActiveTab] = useState<"visible" | "radius">("visible");
   const [visibleSpots, setVisibleSpots] = useState<VisibleSpotWithDistance[]>([]);
+  const [radiusKm, setRadiusKm] = useState(5);
+  const [mapCenter, setMapCenter] = useState<CenterLatLng>({
+    lat: 35.681236,
+    lng: 139.767125,
+  });
   const markerRefs = useRef<Record<number, L.Marker | null>>({});
   const containerClassName =
     (className ?? "") + " flex w-full h-full overflow-hidden";
+
+  const radiusSpots = useMemo(() => {
+    const center = L.latLng(mapCenter.lat, mapCenter.lng);
+    return spots
+      .map((s) => ({
+        ...s,
+        distanceKm: center.distanceTo([s.lat, s.lng]) / 1000,
+      }))
+      .filter((s) => s.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+  }, [spots, mapCenter, radiusKm]);
+
+  const radiusLabel = radiusKm < 1
+    ? `${Math.round(radiusKm * 1000)}m`
+    : `${radiusKm.toFixed(1)}km`;
 
   const handleSpotClick = (spotId: number) => {
     const marker = markerRefs.current[spotId];
@@ -137,7 +166,11 @@ export default function SpotsMap({ spots, className }: Props) {
           </div>
         </div>
 
-        <Tabs defaultValue="visible" className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as "visible" | "radius")}
+          className="flex-1 min-h-0 flex flex-col overflow-hidden"
+        >
           <div className="px-4 pt-4">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger
@@ -191,10 +224,52 @@ export default function SpotsMap({ spots, className }: Props) {
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="radius" className="flex-1 min-h-0 overflow-hidden p-4 mt-0">
-            <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-lg border border-slate-100">
-              ここにスライダー（半径N km）と、検索結果のリストを実装します！
+          <TabsContent value="radius" className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 pb-4 pt-1 mt-0">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+              <input
+                type="range"
+                min={0.5}
+                max={500}
+                step={0.5}
+                value={radiusKm}
+                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                className="w-full accent-slate-800"
+              />
+              <div className="mt-2 text-sm font-semibold text-slate-700">
+                半径{radiusLabel}以内のスポット ({radiusSpots.length}件)
+              </div>
             </div>
+
+            <ScrollArea className="mt-3 flex-1 min-h-0 pr-1">
+              <ul className="space-y-2 pr-3">
+                {radiusSpots.map((s) => (
+                  <li
+                    key={s.id}
+                    className="text-sm p-3 bg-slate-50 rounded-lg border border-slate-100"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSpotClick(s.id)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="font-semibold text-black">{s.name}</div>
+                        <div className="shrink-0 text-xs text-slate-500">
+                          {s.distanceKm < 1
+                            ? `${Math.round(s.distanceKm * 1000)} m`
+                            : `${s.distanceKm.toFixed(2)} km`}
+                        </div>
+                      </div>
+                      {s.category && (
+                        <div className="text-xs text-slate-500 mt-1">
+                          {s.category}
+                        </div>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </div>
@@ -204,13 +279,25 @@ export default function SpotsMap({ spots, className }: Props) {
         <MapContainer
           center={defaultCenter}
           zoom={11}
-          scrollWheelZoom
+          scrollWheelZoom="center"
           className="w-full h-full"
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
+          {activeTab === "radius" && (
+            <Circle
+              center={[mapCenter.lat, mapCenter.lng]}
+              radius={radiusKm * 1000}
+              pathOptions={{
+                color: "#2563eb",
+                fillColor: "#3b82f6",
+                fillOpacity: 0.12,
+                weight: 2,
+              }}
+            />
+          )}
           {spots.map((spot) => (
             <Marker
               key={spot.id}
@@ -234,10 +321,14 @@ export default function SpotsMap({ spots, className }: Props) {
             </Marker>
           ))}
           <MapCenterObserver />
-          <VisibleSpotsUpdater spots={spots} onVisibleChange={setVisibleSpots} />
+          <VisibleSpotsUpdater
+            spots={spots}
+            onVisibleChange={setVisibleSpots}
+            onCenterChange={setMapCenter}
+          />
         </MapContainer>
 
-        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full z-[1000]">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000]">
           <img
             src="/center-pin.svg"
             alt="Center Pin"
