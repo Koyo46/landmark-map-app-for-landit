@@ -40,4 +40,3 @@ backend/dist/
 backend/build/
 backend/coverage/
 backend/.env
-backend/.env.*

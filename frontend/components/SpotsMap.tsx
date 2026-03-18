@@ -72,13 +72,33 @@ type Props = {
 // 初期位置：東京駅あたり
 const defaultCenter: LatLngExpression = [35.681236, 139.767125];
 
-function MapCenterObserver() {
+//中心地点の住所を取得する
+function MapCenterObserver({ onAddressFetched }: { onAddressFetched: (address: string) => void }) {
+  const lastFetchedCenterRef = useRef<L.LatLng | null>(null);
+
   const map = useMapEvents({
-    moveend: () => {
+    moveend: async () => {
       const center = map.getCenter();
-      console.log('中心座標は:', center.lat, center.lng);
+      const previousCenter = lastFetchedCenterRef.current;
+      // ズームのみで中心座標が実質変わっていない場合はAPIを呼ばない
+      if (previousCenter && map.distance(previousCenter, center) < 1) {
+        return;
+      }
+
+      lastFetchedCenterRef.current = center;
+      onAddressFetched("読み込み中...");
+      const address = await fetchAddress(center.lat, center.lng);
+      onAddressFetched(address);
     },
   });
+
+  // 初回マウント時にも実行
+  useEffect(() => {
+    const center = map.getCenter();
+    lastFetchedCenterRef.current = center;
+    fetchAddress(center.lat, center.lng).then(onAddressFetched);
+  }, [map, onAddressFetched]);
+
   return null;
 }
 
@@ -113,6 +133,32 @@ function VisibleSpotsUpdater({
   return null;
 }
 
+const fetchAddress = async (lat: number, lng: number): Promise<string> => {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const res = await fetch(
+      `${apiUrl}/geocoding/reverse-geocode?lat=${lat}&lng=${lng}`,
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to reverse-geocode: ${res.status}`);
+    }
+    const data = await res.json();
+
+    if (typeof data.formattedAddress === "string" && data.formattedAddress) {
+      return data.formattedAddress;
+    }
+
+    if (data.status === "ZERO_RESULTS") {
+      return "住所が見つかりませんでした";
+    }
+
+    return "住所が取得できませんでした";
+  } catch (error) {
+    console.error("住所の取得に失敗しました", error);
+    return "エラーが発生しました";
+  }
+};
+
 export default function SpotsMap({ spots, className }: Props) {
   const [activeTab, setActiveTab] = useState<"visible" | "radius">("visible");
   const [visibleSpots, setVisibleSpots] = useState<VisibleSpotWithDistance[]>([]);
@@ -121,6 +167,7 @@ export default function SpotsMap({ spots, className }: Props) {
     lat: 35.681236,
     lng: 139.767125,
   });
+  const [centerAddress, setCenterAddress] = useState<string>("住所を取得中...");
   const markerRefs = useRef<Record<number, L.Marker | null>>({});
   const containerClassName =
     (className ?? "") + " flex w-full h-full overflow-hidden";
@@ -160,7 +207,7 @@ export default function SpotsMap({ spots, className }: Props) {
                 className="h-4 w-4 drop-shadow-md inline-block"
               />：
               <span className="text-slate-900">
-                {/* TODO: 逆ジオコーディングで住所を表示 */}
+              {centerAddress}
               </span>
             </span>
           </div>
@@ -320,7 +367,7 @@ export default function SpotsMap({ spots, className }: Props) {
               </Popup>
             </Marker>
           ))}
-          <MapCenterObserver />
+          <MapCenterObserver onAddressFetched={setCenterAddress} />
           <VisibleSpotsUpdater
             spots={spots}
             onVisibleChange={setVisibleSpots}
