@@ -17,7 +17,7 @@
 ### 1. リポジトリを取得
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/Koyo46/landmark-map-app-for-landit
 cd landmark-map-app-for-landit
 ```
 
