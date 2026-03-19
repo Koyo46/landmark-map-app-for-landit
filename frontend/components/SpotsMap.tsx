@@ -81,7 +81,7 @@ function MapCenterObserver({ onAddressFetched }: { onAddressFetched: (address: s
       const center = map.getCenter();
       const previousCenter = lastFetchedCenterRef.current;
       // ズームのみで中心座標が実質変わっていない場合はAPIを呼ばない
-      if (previousCenter && map.distance(previousCenter, center) < 1) {
+      if (previousCenter && map.distance(previousCenter, center) < 10) {
         return;
       }
 
