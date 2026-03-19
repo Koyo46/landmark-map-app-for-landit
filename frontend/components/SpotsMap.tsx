@@ -10,8 +10,8 @@ import L from "leaflet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-const iconSize: [number, number] = [40, 40];
-const iconAnchor: [number, number] = [20, 40];
+const iconSize: [number, number] = [32, 32];
+const iconAnchor: [number, number] = [16, 32];
 
 const defaultIcon = L.icon({
   iconUrl: "/marker.svg",
@@ -19,29 +19,29 @@ const defaultIcon = L.icon({
   iconAnchor,
 });
 
-const sightseeingIcon = L.icon({
-  iconUrl: "/sightseeing.svg",
-  iconSize,
-  iconAnchor,
-});
+// const sightseeingIcon = L.icon({
+//   iconUrl: "/sightseeing.svg",
+//   iconSize,
+//   iconAnchor,
+// });
 
-const natureIcon = L.icon({
-  iconUrl: "/nature.svg",
-  iconSize,
-  iconAnchor,
-});
+// const natureIcon = L.icon({
+//   iconUrl: "/nature.svg",
+//   iconSize,
+//   iconAnchor,
+// });
 
 const getIconForCategory = (category: string | null) => {
-  if (!category) return defaultIcon;
-  const normalized = category.toLowerCase();
+//   if (!category) return defaultIcon;
+//   const normalized = category.toLowerCase();
 
-  if (normalized.includes("観光名所")) {
-    return sightseeingIcon;
-  }
+//   if (normalized.includes("観光名所")) {
+//     return sightseeingIcon;
+//   }
 
-  if (normalized.includes("自然景観")) {
-    return natureIcon;
-  }
+//   if (normalized.includes("自然景観")) {
+//     return natureIcon;
+//   }
 
   return defaultIcon;
 };
